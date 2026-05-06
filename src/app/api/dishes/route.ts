@@ -6,12 +6,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+type DishWithAllergens = {
+  dish_allergens: { allergens: { id: string } }[]
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const restaurantId = searchParams.get('restaurant_id')
   const categoryId = searchParams.get('category_id')
-  const excludeAllergens = searchParams.get('exclude_allergens') // "uuid1,uuid2"
-  const dietFilter = searchParams.get('diet') // "vegan", "vegetarian", "gluten_free", "pescatarian"
+  const excludeAllergens = searchParams.get('exclude_allergens')
+  const dietFilter = searchParams.get('diet')
   const onlyAvailable = searchParams.get('only_available')
 
   if (!restaurantId) {
@@ -46,18 +50,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Filtrar por alérgenos a excluir
   let filteredData = data
   if (excludeAllergens) {
     const excludeIds = excludeAllergens.split(',')
-    type DishWithAllergens = {
-  dish_allergens: { allergens: { id: string } }[]
-}
-
-filteredData = data.filter((dish: DishWithAllergens) => {
-  const dishAllergenIds = dish.dish_allergens.map(
-    (da: { allergens: { id: string } }) => da.allergens.id
-  )
+    filteredData = data.filter((dish: DishWithAllergens) => {
+      const dishAllergenIds = dish.dish_allergens.map(
+        (da: { allergens: { id: string } }) => da.allergens.id
+      )
       return !excludeIds.some(id => dishAllergenIds.includes(id))
     })
   }
@@ -68,10 +67,25 @@ filteredData = data.filter((dish: DishWithAllergens) => {
 export async function POST(request: Request) {
   const body = await request.json()
   const {
-    restaurant_id, category_id, name, name_en,
-    description, description_en, price, image_url,
-    is_available, is_featured, is_vegan, is_vegetarian,
-    is_gluten_free, is_pescatarian, position
+    restaurant_id,
+    category_id,
+    name,
+    name_en,
+    name_de,
+    name_fr,
+    description,
+    description_en,
+    description_de,
+    description_fr,
+    price,
+    image_url,
+    is_available,
+    is_featured,
+    is_vegan,
+    is_vegetarian,
+    is_gluten_free,
+    is_pescatarian,
+    position
   } = body
 
   if (!restaurant_id || !name || !price) {
@@ -84,8 +98,18 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from('dishes')
     .insert([{
-      restaurant_id, category_id, name, name_en,
-      description, description_en, price, image_url,
+      restaurant_id,
+      category_id,
+      name,
+      name_en,
+      name_de,
+      name_fr,
+      description,
+      description_en,
+      description_de,
+      description_fr,
+      price,
+      image_url,
       is_available: is_available ?? true,
       is_featured: is_featured ?? false,
       is_vegan: is_vegan ?? false,
@@ -109,7 +133,10 @@ export async function PATCH(request: Request) {
   const { id, ...updates } = body
 
   if (!id) {
-    return NextResponse.json({ error: 'id es obligatorio' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'id es obligatorio' },
+      { status: 400 }
+    )
   }
 
   const { data, error } = await supabase
@@ -131,10 +158,16 @@ export async function DELETE(request: Request) {
   const id = searchParams.get('id')
 
   if (!id) {
-    return NextResponse.json({ error: 'id es obligatorio' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'id es obligatorio' },
+      { status: 400 }
+    )
   }
 
-  const { error } = await supabase.from('dishes').delete().eq('id', id)
+  const { error } = await supabase
+    .from('dishes')
+    .delete()
+    .eq('id', id)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -6,8 +6,12 @@ type Dish = {
   id: string
   name: string
   name_en: string
+  name_de: string
+  name_fr: string
   description: string
   description_en: string
+  description_de: string
+  description_fr: string
   price: number
   is_available: boolean
   is_featured: boolean
@@ -26,9 +30,7 @@ type Category = {
 
 const emptyDish = {
   name: '',
-  name_en: '',
   description: '',
-  description_en: '',
   price: '',
   is_available: true,
   is_featured: false,
@@ -51,6 +53,7 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
   const [form, setForm] = useState(emptyDish)
   const [uploading, setUploading] = useState(false)
   const [formSaving, setFormSaving] = useState(false)
+  const [translating, setTranslating] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -100,9 +103,7 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
     setEditingDish(dish)
     setForm({
       name: dish.name,
-      name_en: dish.name_en || '',
       description: dish.description || '',
-      description_en: dish.description_en || '',
       price: String(dish.price),
       is_available: dish.is_available,
       is_featured: dish.is_featured,
@@ -125,39 +126,61 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
     formData.append('restaurant_id', restaurantId)
     const res = await fetch('/api/upload', { method: 'POST', body: formData })
     const data = await res.json()
-    if (data.url) {
-      setForm(prev => ({ ...prev, image_url: data.url }))
-    }
+    if (data.url) setForm(prev => ({ ...prev, image_url: data.url }))
     setUploading(false)
   }
 
-  const handleSubmit = async () => {
+  const handleTranslateAndSubmit = async () => {
     if (!form.name || !form.price || !form.category_id) {
       alert('Nombre, precio y categoria son obligatorios')
       return
     }
+
+    setTranslating(true)
+
+    const [nameTranslations, descTranslations] = await Promise.all([
+      fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: form.name })
+      }).then(r => r.json()),
+      form.description
+        ? fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: form.description })
+          }).then(r => r.json())
+        : Promise.resolve({ en: '', de: '', fr: '' })
+    ])
+
+    setTranslating(false)
     setFormSaving(true)
+
+    const dishData = {
+      name: form.name,
+      name_en: nameTranslations.en,
+      name_de: nameTranslations.de,
+      name_fr: nameTranslations.fr,
+      description: form.description,
+      description_en: descTranslations.en,
+      description_de: descTranslations.de,
+      description_fr: descTranslations.fr,
+      price: parseFloat(form.price as string),
+      is_available: form.is_available,
+      is_featured: form.is_featured,
+      is_vegan: form.is_vegan,
+      is_vegetarian: form.is_vegetarian,
+      is_gluten_free: form.is_gluten_free,
+      is_pescatarian: form.is_pescatarian,
+      category_id: form.category_id,
+      image_url: form.image_url,
+    }
 
     if (editingDish) {
       const res = await fetch('/api/dishes', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingDish.id,
-          name: form.name,
-          name_en: form.name_en,
-          description: form.description,
-          description_en: form.description_en,
-          price: parseFloat(form.price as string),
-          is_available: form.is_available,
-          is_featured: form.is_featured,
-          is_vegan: form.is_vegan,
-          is_vegetarian: form.is_vegetarian,
-          is_gluten_free: form.is_gluten_free,
-          is_pescatarian: form.is_pescatarian,
-          category_id: form.category_id,
-          image_url: form.image_url,
-        })
+        body: JSON.stringify({ id: editingDish.id, ...dishData })
       })
       const updated = await res.json()
       setDishes(prev => prev.map(d => d.id === editingDish.id ? updated : d))
@@ -165,22 +188,7 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
       const res = await fetch('/api/dishes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurant_id: restaurantId,
-          name: form.name,
-          name_en: form.name_en,
-          description: form.description,
-          description_en: form.description_en,
-          price: parseFloat(form.price as string),
-          is_available: form.is_available,
-          is_featured: form.is_featured,
-          is_vegan: form.is_vegan,
-          is_vegetarian: form.is_vegetarian,
-          is_gluten_free: form.is_gluten_free,
-          is_pescatarian: form.is_pescatarian,
-          category_id: form.category_id,
-          image_url: form.image_url,
-        })
+        body: JSON.stringify({ restaurant_id: restaurantId, ...dishData })
       })
       const created = await res.json()
       setDishes(prev => [...prev, created])
@@ -210,8 +218,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* HEADER */}
       <div className="bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
@@ -227,8 +233,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
-
-        {/* BOTÓN CREAR */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-gray-800">
             Platos ({dishes.length})
@@ -241,31 +245,34 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
           </button>
         </div>
 
-        {/* FORMULARIO CREAR / EDITAR */}
         {showForm && (
           <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-orange-100">
-            <h3 className="text-base font-bold text-gray-900 mb-4">
-              {editingDish ? 'Editar plato' : 'Nuevo plato'}
-            </h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-bold text-gray-900">
+                {editingDish ? 'Editar plato' : 'Nuevo plato'}
+              </h3>
+              <div className="flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-full">
+                <span className="text-sm">🤖</span>
+                <span className="text-xs text-orange-600 font-medium">
+                  Traduccion automatica EN / DE / FR
+                </span>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 gap-4">
 
-              {/* Imagen */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
                   Imagen
                 </label>
                 <div className="flex items-center gap-4">
                   {form.image_url && (
-  <img
-    src={form.image_url}
-    alt="preview"
-    className="w-20 h-20 object-cover rounded-xl border border-gray-100"
-    onError={(e) => {
-      e.currentTarget.style.display = 'none'
-    }}
-  />
-)}
+                    <img
+                      src={form.image_url}
+                      alt="preview"
+                      className="w-20 h-20 object-cover rounded-xl border border-gray-100"
+                    />
+                  )}
                   <div>
                     <input
                       type="file"
@@ -285,63 +292,38 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
                 </div>
               </div>
 
-              {/* Nombre ES / EN */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
-                    Nombre (ES) *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
-                    placeholder="Croquetas de bacalao"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
-                    Nombre (EN)
-                  </label>
-                  <input
-                    type="text"
-                    value={form.name_en}
-                    onChange={e => setForm(p => ({ ...p, name_en: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
-                    placeholder="Cod croquettes"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
+                  Nombre *
+                </label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                  placeholder="Ej: Croquetas de bacalao"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  🤖 Se traducira automaticamente a EN, DE y FR al guardar
+                </p>
               </div>
 
-              {/* Descripción ES / EN */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
-                    Descripcion (ES)
-                  </label>
-                  <textarea
-                    value={form.description}
-                    onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
-                    rows={2}
-                    placeholder="Descripcion del plato..."
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
-                    Descripcion (EN)
-                  </label>
-                  <textarea
-                    value={form.description_en}
-                    onChange={e => setForm(p => ({ ...p, description_en: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
-                    rows={2}
-                    placeholder="Dish description..."
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
+                  Descripcion
+                </label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                  rows={2}
+                  placeholder="Ej: Croquetas artesanales de bacalao con alioli de limon"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  🤖 Se traducira automaticamente a EN, DE y FR al guardar
+                </p>
               </div>
 
-              {/* Precio y Categoria */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
@@ -373,7 +355,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
                 </div>
               </div>
 
-              {/* Opciones */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase mb-2 block">
                   Opciones
@@ -382,10 +363,10 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
                   {[
                     { key: 'is_available', label: 'Disponible' },
                     { key: 'is_featured', label: 'Recomendado' },
-                    { key: 'is_vegan', label: 'Vegano' },
-                    { key: 'is_vegetarian', label: 'Vegetariano' },
-                    { key: 'is_gluten_free', label: 'Sin gluten' },
-                    { key: 'is_pescatarian', label: 'Pescado' },
+                    { key: 'is_vegan', label: '🌱 Vegano' },
+                    { key: 'is_vegetarian', label: '🥦 Vegetariano' },
+                    { key: 'is_gluten_free', label: '🌾 Sin gluten' },
+                    { key: 'is_pescatarian', label: '🐟 Pescado' },
                   ].map(opt => (
                     <label key={opt.key} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                       <input
@@ -400,14 +381,13 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
                 </div>
               </div>
 
-              {/* Botones */}
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={handleSubmit}
-                  disabled={formSaving}
-                  className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-2 rounded-xl transition disabled:opacity-50"
+                  onClick={handleTranslateAndSubmit}
+                  disabled={formSaving || translating}
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-2 rounded-xl transition disabled:opacity-50 flex items-center gap-2"
                 >
-                  {formSaving ? 'Guardando...' : editingDish ? 'Guardar cambios' : 'Crear plato'}
+                  {translating ? '🌐 Traduciendo...' : formSaving ? '💾 Guardando...' : editingDish ? 'Guardar cambios' : 'Crear plato'}
                 </button>
                 <button
                   onClick={() => { setShowForm(false); setEditingDish(null); setForm(emptyDish) }}
@@ -420,7 +400,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
           </div>
         )}
 
-        {/* TABLA DE PLATOS */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -438,21 +417,13 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {dish.image_url ? (
-                        <img
-                          src={dish.image_url}
-                          alt={dish.name}
-                          className="w-10 h-10 object-cover rounded-lg"
-                        />
+                        <img src={dish.image_url} alt={dish.name} className="w-10 h-10 object-cover rounded-lg shrink-0" />
                       ) : (
-                        <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center text-lg">
-                          🍽️
-                        </div>
+                        <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center text-lg shrink-0">🍽️</div>
                       )}
                       <div>
                         <p className="font-medium text-gray-900">{dish.name}</p>
-                        {dish.is_featured && (
-                          <span className="text-xs text-orange-500">⭐ Recomendado</span>
-                        )}
+                        {dish.is_featured && <span className="text-xs text-orange-500">⭐ Recomendado</span>}
                       </div>
                     </div>
                   </td>
@@ -460,9 +431,7 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
                     <span className="text-sm text-gray-500">{getCategoryName(dish.category_id)}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="font-semibold text-orange-500">
-                      {Number(dish.price).toFixed(2)} euros
-                    </span>
+                    <span className="font-semibold text-orange-500">{Number(dish.price).toFixed(2)} €</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
