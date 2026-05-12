@@ -226,30 +226,36 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
     <div className="min-h-screen bg-gray-50">
 
       {/* HEADER */}
-      <div className="bg-white shadow-sm border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Panel Admin</h1>
-            <p className="text-sm text-gray-400 capitalize">
-              {params.slug.replace(/-/g, ' ')}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={verCarta}
-              className="text-sm text-orange-500 hover:text-orange-600 font-medium border border-orange-200 px-4 py-2 rounded-xl transition"
-            >
-              Ver carta
-            </button>
-            <button
-              onClick={openCreate}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2 rounded-xl transition text-sm"
-            >
-              + Nuevo plato
-            </button>
-          </div>
-        </div>
-      </div>
+<div className="bg-white shadow-sm border-b border-gray-100">
+  <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
+    <div>
+      <h1 className="text-xl font-bold text-gray-900">Panel Admin</h1>
+      <p className="text-sm text-gray-400 capitalize">
+        {params.slug.replace(/-/g, ' ')}
+      </p>
+    </div>
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => window.open(`/dashboard/${params.slug}`, '_blank')}
+        className="text-sm text-purple-500 hover:text-purple-600 font-medium border border-purple-200 px-4 py-2 rounded-xl transition flex items-center gap-1.5"
+      >
+        📊 Analytics
+      </button>
+      <button
+        onClick={verCarta}
+        className="text-sm text-orange-500 hover:text-orange-600 font-medium border border-orange-200 px-4 py-2 rounded-xl transition"
+      >
+        Ver carta
+      </button>
+      <button
+        onClick={openCreate}
+        className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2 rounded-xl transition text-sm"
+      >
+        + Nuevo plato
+      </button>
+    </div>
+  </div>
+</div>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
 
