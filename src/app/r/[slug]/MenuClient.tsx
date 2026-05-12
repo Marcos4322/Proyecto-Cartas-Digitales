@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import Wizard from './Wizard'
 import { SkeletonMenu } from './SkeletonCard'
 import Chatbot from './Chatbot'
+import { trackEvent } from '@/lib/analytics'
 
 type Allergen = {
   id: string
   name: string
-  name_en: string
+  name_en: string 
   icon: string
 }
 
@@ -75,31 +76,31 @@ const LANGS: { code: Lang; label: string; flag: string }[] = [
 ]
 
 const DIET_FILTERS = [
-  { key: 'vegan', es: '🌱 Vegano', en: '🌱 Vegan', de: '🌱 Vegan', fr: '🌱 Vegan' },
-  { key: 'vegetarian', es: '🥦 Vegetariano', en: '🥦 Vegetarian', de: '🥦 Vegetarisch', fr: '🥦 Vegetarien' },
-  { key: 'gluten_free', es: '🌾 Sin gluten', en: '🌾 Gluten free', de: '🌾 Glutenfrei', fr: '🌾 Sans gluten' },
-  { key: 'pescatarian', es: '🐟 Pescado', en: '🐟 Pescatarian', de: '🐟 Fisch', fr: '🐟 Poisson' },
+  { key: 'vegan',       es: '🌱 Vegano',      en: '🌱 Vegan',       de: '🌱 Vegan',       fr: '🌱 Vegan'        },
+  { key: 'vegetarian',  es: '🥦 Vegetariano', en: '🥦 Vegetarian',  de: '🥦 Vegetarisch', fr: '🥦 Vegetarien'   },
+  { key: 'gluten_free', es: '🌾 Sin gluten',  en: '🌾 Gluten free', de: '🌾 Glutenfrei',  fr: '🌾 Sans gluten'  },
+  { key: 'pescatarian', es: '🐟 Pescado',     en: '🐟 Pescatarian', de: '🐟 Fisch',       fr: '🐟 Poisson'      },
 ]
 
 const UI: Record<string, Record<Lang, string>> = {
-  all: { es: 'Todo', en: 'All', de: 'Alle', fr: 'Tout' },
-  recommended: { es: '⭐ Recomendado', en: '⭐ Recommended', de: '⭐ Empfohlen', fr: '⭐ Recommande' },
-  soldout: { es: '🚫 Agotado', en: '🚫 Sold out', de: '🚫 Ausverkauft', fr: '🚫 Epuise' },
-  vegan: { es: '🌱 Vegano', en: '🌱 Vegan', de: '🌱 Vegan', fr: '🌱 Vegan' },
-  glutenfree: { es: '🌾 Sin gluten', en: '🌾 GF', de: '🌾 GF', fr: '🌾 SG' },
-  noResults: { es: 'No hay platos con estos filtros', en: 'No dishes match your filters', de: 'Keine Gerichte', fr: 'Aucun plat' },
-  clearFilters: { es: 'Limpiar filtros', en: 'Clear filters', de: 'Filter loschen', fr: 'Effacer filtres' },
-  showAll: { es: 'Ver todos', en: 'Show all', de: 'Alle zeigen', fr: 'Tout afficher' },
-  allergens: { es: '⚠️ Alergenos', en: '⚠️ Allergens', de: '⚠️ Allergene', fr: '⚠️ Allergenes' },
-  exclude: { es: 'Excluir alergenos:', en: 'Exclude allergens:', de: 'Allergene:', fr: 'Exclure:' },
-  dishes: { es: 'platos', en: 'dishes', de: 'Gerichte', fr: 'plats' },
-  powered: { es: 'Carta digital por', en: 'Digital menu by', de: 'Digitale Karte von', fr: 'Menu par' },
-  tabForYou: { es: '✨ Para ti', en: '✨ For you', de: '✨ Fur dich', fr: '✨ Pour toi' },
-  tabMenu: { es: '🍽️ Carta completa', en: '🍽️ Full menu', de: '🍽️ Speisekarte', fr: '🍽️ Carte complete' },
-  forYouSub: { es: 'Basado en tus preferencias', en: 'Based on your preferences', de: 'Basierend auf Ihren Vorlieben', fr: 'Selon vos preferences' },
-  changePrefs: { es: 'Cambiar preferencias', en: 'Change preferences', de: 'Andern', fr: 'Modifier' },
-  noForYou: { es: 'No encontramos platos que coincidan con tus preferencias. Prueba a cambiarlas.', en: 'No dishes match your preferences. Try changing them.', de: 'Keine passenden Gerichte.', fr: 'Aucun plat correspondant.' },
-  goToMenu: { es: 'Ver carta completa', en: 'See full menu', de: 'Zur Speisekarte', fr: 'Voir la carte' },
+  all:          { es: 'Todo',              en: 'All',              de: 'Alle',              fr: 'Tout'              },
+  recommended:  { es: '⭐ Recomendado',   en: '⭐ Recommended',  de: '⭐ Empfohlen',     fr: '⭐ Recommande'    },
+  soldout:      { es: '🚫 Agotado',       en: '🚫 Sold out',     de: '🚫 Ausverkauft',  fr: '🚫 Epuise'        },
+  vegan:        { es: '🌱 Vegano',        en: '🌱 Vegan',        de: '🌱 Vegan',        fr: '🌱 Vegan'         },
+  glutenfree:   { es: '🌾 Sin gluten',    en: '🌾 GF',           de: '🌾 GF',           fr: '🌾 SG'            },
+  noResults:    { es: 'No hay platos con estos filtros', en: 'No dishes match your filters', de: 'Keine Gerichte', fr: 'Aucun plat' },
+  clearFilters: { es: 'Limpiar filtros',  en: 'Clear filters',   de: 'Filter loschen',  fr: 'Effacer filtres'  },
+  showAll:      { es: 'Ver todos',        en: 'Show all',        de: 'Alle zeigen',     fr: 'Tout afficher'    },
+  allergens:    { es: '⚠️ Alergenos',    en: '⚠️ Allergens',   de: '⚠️ Allergene',   fr: '⚠️ Allergenes'   },
+  exclude:      { es: 'Excluir alergenos:', en: 'Exclude allergens:', de: 'Allergene:', fr: 'Exclure:'         },
+  dishes:       { es: 'platos',           en: 'dishes',          de: 'Gerichte',        fr: 'plats'            },
+  powered:      { es: 'Carta digital por', en: 'Digital menu by', de: 'Digitale Karte von', fr: 'Menu par'     },
+  tabForYou:    { es: '✨ Para ti',       en: '✨ For you',      de: '✨ Fur dich',     fr: '✨ Pour toi'      },
+  tabMenu:      { es: '🍽️ Carta completa', en: '🍽️ Full menu', de: '🍽️ Speisekarte', fr: '🍽️ Carte complete' },
+  forYouSub:    { es: 'Basado en tus preferencias', en: 'Based on your preferences', de: 'Basierend auf Ihren Vorlieben', fr: 'Selon vos preferences' },
+  changePrefs:  { es: 'Cambiar preferencias', en: 'Change preferences', de: 'Andern', fr: 'Modifier'         },
+  noForYou:     { es: 'No encontramos platos que coincidan con tus preferencias. Prueba a cambiarlas.', en: 'No dishes match your preferences. Try changing them.', de: 'Keine passenden Gerichte.', fr: 'Aucun plat correspondant.' },
+  goToMenu:     { es: 'Ver carta completa', en: 'See full menu', de: 'Zur Speisekarte', fr: 'Voir la carte'   },
 }
 
 function t(key: string, lang: Lang): string {
@@ -130,28 +131,64 @@ function categoryName(cat: Category, lang: Lang): string {
 function filterByPreferences(dishes: Dish[], prefs: WizardPreferences): Dish[] {
   return dishes.filter(dish => {
     if (!dish.is_available) return false
-
     if (prefs.excludedAllergens.length > 0) {
-      const dishAllergenIds = dish.dish_allergens.map(da => da.allergens.id)
-      if (prefs.excludedAllergens.some(id => dishAllergenIds.includes(id))) return false
+      const ids = dish.dish_allergens.map(da => da.allergens.id)
+      if (prefs.excludedAllergens.some(id => ids.includes(id))) return false
     }
-
-    if (prefs.diet === 'vegan') {
-      if (!dish.is_vegan || dish.is_meat) return false
-    }
-    if (prefs.diet === 'vegetarian') {
-      if (!dish.is_vegetarian || dish.is_meat) return false
-    }
+    if (prefs.diet === 'vegan' && (!dish.is_vegan || dish.is_meat)) return false
+    if (prefs.diet === 'vegetarian' && (!dish.is_vegetarian || dish.is_meat)) return false
     if (prefs.diet === 'gluten_free' && !dish.is_gluten_free) return false
     if (prefs.diet === 'pescatarian' && dish.is_meat) return false
-
     return true
   })
 }
 
-function DishCard({ dish, lang }: { dish: Dish; lang: Lang }) {
+function DishCard({
+  dish,
+  lang,
+  restaurantId,
+}: {
+  dish: Dish
+  lang: Lang
+  restaurantId: string
+}) {
+  useEffect(() => {
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  const observer = new IntersectionObserver(
+    entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          // Solo registra si el usuario mira el plato al menos 1 segundo
+          timer = setTimeout(() => {
+            trackEvent(restaurantId, 'dish_view', { dish_name: dish.name })
+            observer.disconnect()
+          }, 1000)
+        } else {
+          // Si sale del viewport antes de 1 segundo, cancela el tracking
+          if (timer) clearTimeout(timer)
+        }
+      })
+    },
+    { threshold: 0.5 }
+  )
+
+  const el = document.getElementById(`dish-${dish.id}`)
+  if (el) observer.observe(el)
+
+  return () => {
+    observer.disconnect()
+    if (timer) clearTimeout(timer)
+  }
+}, [])
+
   return (
-    <div className={`bg-white rounded-2xl shadow-sm overflow-hidden flex transition ${!dish.is_available ? 'opacity-50' : 'hover:shadow-md'}`}>
+    <div
+      id={`dish-${dish.id}`}
+      className={`bg-white rounded-2xl shadow-sm overflow-hidden flex transition ${
+        !dish.is_available ? 'opacity-50' : 'hover:shadow-md'
+      }`}
+    >
       <div className="flex-1 p-4">
         <div className="flex flex-wrap gap-1 mb-1.5">
           {dish.is_featured && (
@@ -179,7 +216,11 @@ function DishCard({ dish, lang }: { dish: Dish; lang: Lang }) {
         {dish.dish_allergens.length > 0 && (
           <div className="flex flex-wrap gap-0.5 mt-2">
             {dish.dish_allergens.map(({ allergens: a }) => (
-              <span key={a.id} title={lang === 'es' ? a.name : a.name_en} className="text-sm cursor-help">
+              <span
+                key={a.id}
+                title={lang === 'es' ? a.name : a.name_en}
+                className="text-sm cursor-help"
+              >
                 {a.icon}
               </span>
             ))}
@@ -224,17 +265,20 @@ export default function MenuClient({ data }: Props) {
   const [preferences, setPreferences] = useState<WizardPreferences | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Skeleton de carga
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 800)
     return () => clearTimeout(timer)
   }, [])
 
+  // Preferencias del wizard
   useEffect(() => {
     const saved = localStorage.getItem('menuai_preferences')
     if (saved) {
       const parsed = JSON.parse(saved)
       setPreferences(parsed)
-      const hasPrefs = parsed.diet !== null ||
+      const hasPrefs =
+        parsed.diet !== null ||
         parsed.excludedAllergens.length > 0 ||
         parsed.foodTypes.length > 0
       if (hasPrefs) setActiveTab('forYou')
@@ -244,11 +288,33 @@ export default function MenuClient({ data }: Props) {
     }
   }, [])
 
+  // Tracking: escaneo QR al abrir la carta
+  useEffect(() => {
+    if (!isLoading && restaurant.id) {
+      trackEvent(restaurant.id, 'qr_scan', { source: 'table_qr' })
+    }
+  }, [isLoading, restaurant.id])
+
+  // Tracking: cambio de idioma
+  useEffect(() => {
+    if (!isLoading && restaurant.id && lang !== 'es') {
+      trackEvent(restaurant.id, 'language_change', { lang })
+    }
+  }, [lang])
+
+  // Tracking: filtro de dieta usado
+  useEffect(() => {
+    if (activeDiet && restaurant.id) {
+      trackEvent(restaurant.id, 'filter_used', { filter_name: activeDiet })
+    }
+  }, [activeDiet])
+
   const handleWizardComplete = (prefs: WizardPreferences) => {
     setPreferences(prefs)
     localStorage.setItem('menuai_preferences', JSON.stringify(prefs))
     setShowWizard(false)
-    const hasPrefs = prefs.diet !== null ||
+    const hasPrefs =
+      prefs.diet !== null ||
       prefs.excludedAllergens.length > 0 ||
       prefs.foodTypes.length > 0
     if (hasPrefs) setActiveTab('forYou')
@@ -283,11 +349,11 @@ export default function MenuClient({ data }: Props) {
     )
   }
 
-  const hasPreferences = preferences && (
-    preferences.diet !== null ||
-    preferences.excludedAllergens.length > 0 ||
-    preferences.foodTypes.length > 0
-  )
+  const hasPreferences =
+    preferences &&
+    (preferences.diet !== null ||
+      preferences.excludedAllergens.length > 0 ||
+      preferences.foodTypes.length > 0)
 
   const forYouDishes = preferences ? filterByPreferences(dishes, preferences) : []
 
@@ -338,7 +404,9 @@ export default function MenuClient({ data }: Props) {
                   <button
                     key={l.code}
                     onClick={() => { setLang(l.code); setShowLangMenu(false) }}
-                    className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition ${lang === l.code ? 'font-bold text-orange-500 bg-orange-50' : 'text-gray-700'}`}
+                    className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition ${
+                      lang === l.code ? 'font-bold text-orange-500 bg-orange-50' : 'text-gray-700'
+                    }`}
                   >
                     {l.flag} {l.label}
                   </button>
@@ -376,7 +444,7 @@ export default function MenuClient({ data }: Props) {
           </div>
         </div>
 
-        {/* FILTROS — solo visibles en pestaña carta completa */}
+        {/* FILTROS — solo en pestaña carta */}
         {activeTab === 'menu' && (
           <div className="border-t border-gray-50">
             <div className="max-w-2xl mx-auto px-4 pt-2 pb-1">
@@ -480,7 +548,12 @@ export default function MenuClient({ data }: Props) {
                 <>
                   <div className="space-y-3">
                     {forYouDishes.map(dish => (
-                      <DishCard key={dish.id} dish={dish} lang={lang} />
+                      <DishCard
+                        key={dish.id}
+                        dish={dish}
+                        lang={lang}
+                        restaurantId={restaurant.id}
+                      />
                     ))}
                   </div>
                   <button
@@ -553,7 +626,12 @@ export default function MenuClient({ data }: Props) {
               ) : (
                 <div className="space-y-3">
                   {filteredDishes.map(dish => (
-                    <DishCard key={dish.id} dish={dish} lang={lang} />
+                    <DishCard
+                      key={dish.id}
+                      dish={dish}
+                      lang={lang}
+                      restaurantId={restaurant.id}
+                    />
                   ))}
                 </div>
               )}
@@ -572,7 +650,10 @@ export default function MenuClient({ data }: Props) {
       )}
 
       <div className="text-center py-10 text-xs text-gray-300">
-        <p>{t('powered', lang)} <span className="font-bold text-orange-300">MenuAI</span></p>
+        <p>
+          {t('powered', lang)}{' '}
+          <span className="font-bold text-orange-300">MenuAI</span>
+        </p>
       </div>
     </div>
   )
