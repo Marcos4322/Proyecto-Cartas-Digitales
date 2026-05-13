@@ -34,11 +34,13 @@ type AnalyticsData = {
     dish_views: number
     filters_used: number
     lang_changes: number
+    likes: number
   }
   top_dishes: { name: string; count: number }[]
   top_filters: { name: string; count: number }[]
   top_langs: { lang: string; count: number }[]
   scans_per_day: { date: string; count: number }[]
+  dish_likes: { name: string; likes: number }[]
 }
 
 const FILTER_LABELS: Record<string, string> = {
@@ -97,8 +99,8 @@ export default function DashboardPage({
     const fetchRestaurant = async () => {
       const res = await fetch('/api/restaurants')
       const restaurants = await res.json()
-      const restaurant = restaurants.find((r: { slug: string; id: string; name: string }) =>
-        r.slug === params.slug
+      const restaurant = restaurants.find(
+        (r: { slug: string; id: string; name: string }) => r.slug === params.slug
       )
       if (restaurant) {
         setRestaurantId(restaurant.id)
@@ -137,7 +139,6 @@ export default function DashboardPage({
 
   if (!data) return null
 
-  // Datos para grafico de escaneos por dia
   const scansLineData = {
     labels: data.scans_per_day.map(d => {
       const date = new Date(d.date)
@@ -158,7 +159,6 @@ export default function DashboardPage({
     ],
   }
 
-  // Datos para grafico de platos mas vistos
   const dishesBarData = {
     labels: data.top_dishes.map(d =>
       d.name.length > 18 ? d.name.substring(0, 18) + '...' : d.name
@@ -183,18 +183,12 @@ export default function DashboardPage({
     ],
   }
 
-  // Datos para grafico de idiomas
   const langsDoughnutData = {
     labels: data.top_langs.map(l => LANG_LABELS[l.lang] || l.lang),
     datasets: [
       {
         data: data.top_langs.map(l => l.count),
-        backgroundColor: [
-          '#3B82F6',
-          '#EF4444',
-          '#10B981',
-          '#F97316',
-        ],
+        backgroundColor: ['#3B82F6', '#EF4444', '#10B981', '#F97316'],
         borderWidth: 0,
       },
     ],
@@ -202,31 +196,18 @@ export default function DashboardPage({
 
   const chartOptions = {
     responsive: true,
-    plugins: {
-      legend: { display: false },
-    },
+    plugins: { legend: { display: false } },
     scales: {
-      x: {
-        grid: { display: false },
-        ticks: { font: { size: 11 } },
-      },
-      y: {
-        grid: { color: 'rgba(0,0,0,0.04)' },
-        ticks: { font: { size: 11 } },
-      },
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } } },
     },
   }
 
   const lineOptions = {
     responsive: true,
-    plugins: {
-      legend: { display: false },
-    },
+    plugins: { legend: { display: false } },
     scales: {
-      x: {
-        grid: { display: false },
-        ticks: { font: { size: 11 } },
-      },
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
       y: {
         grid: { color: 'rgba(0,0,0,0.04)' },
         ticks: { font: { size: 11 }, stepSize: 1 },
@@ -246,7 +227,6 @@ export default function DashboardPage({
             <p className="text-sm text-gray-400 capitalize">{restaurantName}</p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Selector de periodo */}
             <select
               value={period}
               onChange={e => setPeriod(Number(e.target.value))}
@@ -268,8 +248,8 @@ export default function DashboardPage({
 
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
 
-        {/* TARJETAS DE METRICAS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* TARJETAS DE METRICAS — ahora 5 */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             icon="📱"
             label="Escaneos QR"
@@ -293,6 +273,12 @@ export default function DashboardPage({
             label="Cambios de idioma"
             value={data.totals.lang_changes}
             color="bg-purple-100 text-purple-600"
+          />
+          <StatCard
+            icon="❤️"
+            label="Me gusta"
+            value={data.totals.likes}
+            color="bg-red-100 text-red-500"
           />
         </div>
 
@@ -336,7 +322,8 @@ export default function DashboardPage({
               {data.top_filters.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-4">Sin datos todavia</p>
               )}
-{data.top_filters.map((f) => {                const max = data.top_filters[0]?.count || 1
+              {data.top_filters.map(f => {
+                const max = data.top_filters[0]?.count || 1
                 const pct = Math.round((f.count / max) * 100)
                 return (
                   <div key={f.name}>
@@ -405,12 +392,12 @@ export default function DashboardPage({
 
         </div>
 
-        {/* TABLA TOP PLATOS */}
+        {/* TABLA RANKING DE PLATOS */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Ranking de platos</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Ordenados por numero de vistas</p>
+              <p className="text-xs text-gray-400 mt-0.5">Vistas y me gusta por plato</p>
             </div>
             <span className="text-2xl">🏆</span>
           </div>
@@ -420,6 +407,7 @@ export default function DashboardPage({
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">#</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Plato</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Vistas</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">❤️ Likes</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Popularidad</th>
               </tr>
             </thead>
@@ -428,6 +416,7 @@ export default function DashboardPage({
                 const max = data.top_dishes[0]?.count || 1
                 const pct = Math.round((dish.count / max) * 100)
                 const medals = ['🥇', '🥈', '🥉']
+                const dishLike = data.dish_likes.find(d => d.name === dish.name)
                 return (
                   <tr key={dish.name} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4">
@@ -438,6 +427,11 @@ export default function DashboardPage({
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-bold text-orange-500 text-sm">{dish.count}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-bold text-red-400 text-sm">
+                        {dishLike ? `❤️ ${dishLike.likes}` : '—'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 w-48">
                       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -453,6 +447,57 @@ export default function DashboardPage({
             </tbody>
           </table>
         </div>
+
+        {/* TABLA LIKES POR PLATO */}
+        {data.dish_likes.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Platos mas queridos</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Ordenados por me gusta</p>
+              </div>
+              <span className="text-2xl">❤️</span>
+            </div>
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">#</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Plato</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Me gusta</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Popularidad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {data.dish_likes.map((dish, i) => {
+                  const max = data.dish_likes[0]?.likes || 1
+                  const pct = Math.round((dish.likes / max) * 100)
+                  const medals = ['🥇', '🥈', '🥉']
+                  return (
+                    <tr key={dish.name} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4">
+                        <span className="text-lg">{medals[i] || `${i + 1}`}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-medium text-gray-900 text-sm">{dish.name}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-red-400 text-sm">❤️ {dish.likes}</span>
+                      </td>
+                      <td className="px-6 py-4 w-48">
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-red-400 rounded-full transition-all duration-700"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
       </div>
     </div>

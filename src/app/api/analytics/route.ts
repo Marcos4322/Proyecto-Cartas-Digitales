@@ -6,7 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// POST — Registrar un evento
 export async function POST(request: Request) {
   const body = await request.json()
   const { restaurant_id, event_type, metadata, session_id } = body
@@ -29,7 +28,6 @@ export async function POST(request: Request) {
   return NextResponse.json({ success: true })
 }
 
-// GET — Obtener agregaciones para el dashboard
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const restaurantId = searchParams.get('restaurant_id')
@@ -78,7 +76,15 @@ export async function GET(request: Request) {
     .eq('event_type', 'language_change')
     .gte('created_at', sinceISO)
 
-  // 5. Platos mas vistos
+  // 5. Total likes
+  const { count: totalLikes } = await supabase
+    .from('events')
+    .select('*', { count: 'exact', head: true })
+    .eq('restaurant_id', restaurantId)
+    .eq('event_type', 'dish_like')
+    .gte('created_at', sinceISO)
+
+  // 6. Platos mas vistos
   const { data: dishViewsRaw } = await supabase
     .from('events')
     .select('metadata')
@@ -96,7 +102,7 @@ export async function GET(request: Request) {
     .slice(0, 8)
     .map(([name, count]) => ({ name, count }))
 
-  // 6. Filtros mas usados
+  // 7. Filtros mas usados
   const { data: filtersRaw } = await supabase
     .from('events')
     .select('metadata')
@@ -113,7 +119,7 @@ export async function GET(request: Request) {
     .sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ name, count }))
 
-  // 7. Idiomas mas usados
+  // 8. Idiomas mas usados
   const { data: langsRaw } = await supabase
     .from('events')
     .select('metadata')
@@ -130,7 +136,7 @@ export async function GET(request: Request) {
     .sort((a, b) => b[1] - a[1])
     .map(([lang, count]) => ({ lang, count }))
 
-  // 8. Escaneos por dia (ultimos 7 dias)
+  // 9. Escaneos por dia (ultimos 7 dias)
   const { data: scansByDayRaw } = await supabase
     .from('events')
     .select('created_at')
@@ -152,6 +158,14 @@ export async function GET(request: Request) {
   const scansPerDay = Object.entries(scansByDay)
     .map(([date, count]) => ({ date, count }))
 
+  // 10. Likes por plato
+  const { data: dishLikes } = await supabase
+    .from('dishes')
+    .select('name, likes')
+    .eq('restaurant_id', restaurantId)
+    .gt('likes', 0)
+    .order('likes', { ascending: false })
+
   return NextResponse.json({
     period_days: days,
     totals: {
@@ -159,10 +173,12 @@ export async function GET(request: Request) {
       dish_views: totalDishViews || 0,
       filters_used: totalFilters || 0,
       lang_changes: totalLangChanges || 0,
+      likes: totalLikes || 0,
     },
     top_dishes: topDishes,
     top_filters: topFilters,
     top_langs: topLangs,
     scans_per_day: scansPerDay,
+    dish_likes: dishLikes || [],
   })
 }

@@ -32,6 +32,7 @@ type Dish = {
   is_gluten_free: boolean
   is_pescatarian: boolean
   is_meat: boolean
+  likes: number
   category_id: string
   dish_allergens: { allergens: Allergen }[]
 }
@@ -152,35 +153,78 @@ function DishCard({
   lang: Lang
   restaurantId: string
 }) {
+  const [liked, setLiked] = useState(false)
+  const [likesCount, setLikesCount] = useState(dish.likes || 0)
+  const [animating, setAnimating] = useState(false)
+
   useEffect(() => {
-  let timer: ReturnType<typeof setTimeout> | null = null
+    const likedDishes = JSON.parse(localStorage.getItem('menuai_likes') || '[]')
+    if (likedDishes.includes(dish.id)) setLiked(true)
+  }, [dish.id])
 
-  const observer = new IntersectionObserver(
-    entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          // Solo registra si el usuario mira el plato al menos 1 segundo
-          timer = setTimeout(() => {
-            trackEvent(restaurantId, 'dish_view', { dish_name: dish.name })
-            observer.disconnect()
-          }, 1000)
-        } else {
-          // Si sale del viewport antes de 1 segundo, cancela el tracking
-          if (timer) clearTimeout(timer)
-        }
-      })
-    },
-    { threshold: 0.5 }
-  )
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            timer = setTimeout(() => {
+              trackEvent(restaurantId, 'dish_view', { dish_name: dish.name })
+              observer.disconnect()
+            }, 1000)
+          } else {
+            if (timer) clearTimeout(timer)
+          }
+        })
+      },
+      { threshold: 0.5 }
+    )
+    const el = document.getElementById(`dish-${dish.id}`)
+    if (el) observer.observe(el)
+    return () => {
+      observer.disconnect()
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
 
-  const el = document.getElementById(`dish-${dish.id}`)
-  if (el) observer.observe(el)
+  const handleLike = async () => {
+    const action = liked ? 'unlike' : 'like'
 
-  return () => {
-    observer.disconnect()
-    if (timer) clearTimeout(timer)
+    // Animacion solo al dar like
+    if (!liked) {
+      setAnimating(true)
+      setTimeout(() => setAnimating(false), 600)
+    }
+
+    // Actualizar estado local inmediatamente
+    setLiked(!liked)
+    setLikesCount(prev => liked ? Math.max(0, prev - 1) : prev + 1)
+
+    // Actualizar localStorage
+    const likedDishes = JSON.parse(localStorage.getItem('menuai_likes') || '[]')
+    if (liked) {
+      localStorage.setItem(
+        'menuai_likes',
+        JSON.stringify(likedDishes.filter((id: string) => id !== dish.id))
+      )
+    } else {
+      localStorage.setItem(
+        'menuai_likes',
+        JSON.stringify([...likedDishes, dish.id])
+      )
+    }
+
+    // Llamar a la API
+    await fetch('/api/likes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dish_id: dish.id,
+        restaurant_id: restaurantId,
+        action,
+      }),
+    })
   }
-}, [])
 
   return (
     <div
@@ -207,12 +251,14 @@ function DishCard({
             </span>
           )}
         </div>
+
         <h3 className="font-bold text-gray-900 text-base leading-tight">
           {dishName(dish, lang)}
         </h3>
         <p className="text-sm text-gray-500 mt-1 leading-snug line-clamp-2">
           {dishDesc(dish, lang)}
         </p>
+
         {dish.dish_allergens.length > 0 && (
           <div className="flex flex-wrap gap-0.5 mt-2">
             {dish.dish_allergens.map(({ allergens: a }) => (
@@ -226,17 +272,51 @@ function DishCard({
             ))}
           </div>
         )}
+
         <div className="flex items-center justify-between mt-3">
           <span className="text-xl font-black text-orange-500">
             {Number(dish.price).toFixed(2)} €
           </span>
-          {!dish.is_available && (
-            <span className="text-xs bg-red-100 text-red-500 px-2.5 py-1 rounded-full font-semibold">
-              {t('soldout', lang)}
-            </span>
-          )}
+
+          <div className="flex items-center gap-2">
+            {!dish.is_available && (
+              <span className="text-xs bg-red-100 text-red-500 px-2.5 py-1 rounded-full font-semibold">
+                {t('soldout', lang)}
+              </span>
+            )}
+
+            {/* BOTON DE LIKE */}
+            <button
+              onClick={handleLike}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 active:scale-95 ${
+                liked
+                  ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                  : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-400'
+              }`}
+            >
+              <span
+                className={`transition-transform duration-300 inline-block ${
+                  animating ? 'scale-150' : 'scale-100'
+                }`}
+              >
+                {liked ? '❤️' : '🤍'}
+              </span>
+              {likesCount > 0 ? (
+                <span className={liked ? 'text-red-500' : 'text-gray-500'}>
+                  {likesCount}
+                </span>
+              ) : (
+                <span className="text-gray-300">
+                  {lang === 'es' ? 'Me gusta' :
+                   lang === 'en' ? 'Like' :
+                   lang === 'de' ? 'Gefällt mir' : 'Jaime'}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
+
       {dish.image_url ? (
         <img
           src={dish.image_url}
