@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import MenuClient from './MenuClient'
+import { Metadata } from 'next'
 
 export const revalidate = 0
 
@@ -38,6 +39,31 @@ async function getRestaurantData(slug: string) {
     .order('position')
 
   return { restaurant, categories: categories || [], dishes: dishes || [] }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}): Promise<Metadata> {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: restaurant } = await supabase
+    .from('restaurants')
+    .select('name, description')
+    .eq('slug', params.slug)
+    .single()
+
+  const name = restaurant?.name || 'Carta digital'
+  const description = restaurant?.description || 'Carta digital con filtros de alérgenos y dieta'
+
+  return {
+    title: `${name} — MenuAI`,
+    description: `${description}. Filtra por alérgenos, dieta e idioma.`,
+  }
 }
 
 export default async function MenuPage({
