@@ -6,7 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// GET — Obtener categorías de un restaurante
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const restaurantId = searchParams.get('restaurant_id')
@@ -32,7 +31,6 @@ export async function GET(request: Request) {
   return NextResponse.json(data)
 }
 
-// POST — Crear una categoría nueva
 export async function POST(request: Request) {
   const body = await request.json()
   const { restaurant_id, name, name_en, position } = body
@@ -55,4 +53,27 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(data, { status: 201 })
+}
+
+export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+
+  if (!id) {
+    return NextResponse.json(
+      { error: 'id es obligatorio' },
+      { status: 400 }
+    )
+  }
+
+  const { error } = await supabase
+    .from('categories')
+    .update({ is_active: false })
+    .eq('id', id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
 }

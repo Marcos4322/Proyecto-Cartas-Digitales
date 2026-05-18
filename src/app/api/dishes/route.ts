@@ -85,7 +85,9 @@ export async function POST(request: Request) {
     is_vegetarian,
     is_gluten_free,
     is_pescatarian,
-    position
+    is_meat,
+    position,
+    allergen_ids, // ← array de UUIDs de alérgenos
   } = body
 
   if (!restaurant_id || !name || !price) {
@@ -95,7 +97,8 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data, error } = await supabase
+  // 1. Crear el plato
+  const { data: dish, error: dishError } = await supabase
     .from('dishes')
     .insert([{
       restaurant_id,
@@ -116,21 +119,54 @@ export async function POST(request: Request) {
       is_vegetarian: is_vegetarian ?? false,
       is_gluten_free: is_gluten_free ?? false,
       is_pescatarian: is_pescatarian ?? false,
-      position: position ?? 0
+      is_meat: is_meat ?? false,
+      position: position ?? 0,
     }])
     .select()
     .single()
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (dishError) {
+    return NextResponse.json({ error: dishError.message }, { status: 500 })
   }
 
-  return NextResponse.json(data, { status: 201 })
+  // 2. Insertar alérgenos si se han seleccionado
+  if (allergen_ids && allergen_ids.length > 0) {
+    const allergenRows = allergen_ids.map((allergenId: string) => ({
+      dish_id: dish.id,
+      allergen_id: allergenId,
+    }))
+
+    const { error: allergenError } = await supabase
+      .from('dish_allergens')
+      .insert(allergenRows)
+
+    if (allergenError) {
+      return NextResponse.json({ error: allergenError.message }, { status: 500 })
+    }
+  }
+
+  // 3. Devolver el plato con sus alérgenos
+  const { data: dishWithAllergens } = await supabase
+    .from('dishes')
+    .select(`
+      *,
+      dish_allergens(
+        allergens(id, name, name_en, icon)
+      )
+    `)
+    .eq('id', dish.id)
+    .single()
+
+  return NextResponse.json(dishWithAllergens, { status: 201 })
 }
 
 export async function PATCH(request: Request) {
   const body = await request.json()
-  const { id, ...updates } = body
+  const {
+    id,
+    allergen_ids, // ← array de UUIDs de alérgenos
+    ...updates
+  } = body
 
   if (!id) {
     return NextResponse.json(
@@ -139,18 +175,58 @@ export async function PATCH(request: Request) {
     )
   }
 
-  const { data, error } = await supabase
-    .from('dishes')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single()
+  // 1. Actualizar el plato
+const { error: dishError } = await supabase
+  .from('dishes')
+  .update({ ...updates, updated_at: new Date().toISOString() })
+  .eq('id', id)
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (dishError) {
+    return NextResponse.json({ error: dishError.message }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  // 2. Si se pasan allergen_ids, actualizar los alérgenos
+  if (allergen_ids !== undefined) {
+    // Borrar todos los alérgenos anteriores del plato
+    const { error: deleteError } = await supabase
+      .from('dish_allergens')
+      .delete()
+      .eq('dish_id', id)
+
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    }
+
+    // Insertar los nuevos alérgenos si hay alguno seleccionado
+    if (allergen_ids.length > 0) {
+      const allergenRows = allergen_ids.map((allergenId: string) => ({
+        dish_id: id,
+        allergen_id: allergenId,
+      }))
+
+      const { error: insertError } = await supabase
+        .from('dish_allergens')
+        .insert(allergenRows)
+
+      if (insertError) {
+        return NextResponse.json({ error: insertError.message }, { status: 500 })
+      }
+    }
+  }
+
+  // 3. Devolver el plato con sus alérgenos actualizados
+  const { data: dishWithAllergens } = await supabase
+    .from('dishes')
+    .select(`
+      *,
+      dish_allergens(
+        allergens(id, name, name_en, icon)
+      )
+    `)
+    .eq('id', id)
+    .single()
+
+  return NextResponse.json(dishWithAllergens)
 }
 
 export async function DELETE(request: Request) {
@@ -164,6 +240,7 @@ export async function DELETE(request: Request) {
     )
   }
 
+  // Los dish_allergens se borran solos por el CASCADE de la BD
   const { error } = await supabase
     .from('dishes')
     .delete()
