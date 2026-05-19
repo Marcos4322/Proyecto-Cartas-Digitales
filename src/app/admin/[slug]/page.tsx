@@ -1,6 +1,14 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+// Por esto
+import { createBrowserClient } from '@supabase/ssr'
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+import { useRouter } from 'next/navigation'
 
 type Allergen = {
   id: string
@@ -58,6 +66,8 @@ const emptyDish = {
 
 type ActiveTab = 'dishes' | 'categories'
 
+const DEMO_SLUG = 'la-taberna-del-puerto'
+
 export default function AdminPage({ params }: { params: { slug: string } }) {
   const [dishes, setDishes] = useState<Dish[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -75,9 +85,14 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [savingCategory, setSavingCategory] = useState(false)
   const [deletingCategory, setDeletingCategory] = useState<string | null>(null)
+  const [isDemo, setIsDemo] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
+
 
   useEffect(() => {
+    setIsDemo(params.slug === DEMO_SLUG)
+
     const fetchData = async () => {
       const restRes = await fetch('/api/restaurants')
       const restaurants = await restRes.json()
@@ -100,6 +115,11 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
     }
     fetchData()
   }, [params.slug])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   const toggleAvailable = async (dish: Dish) => {
     setSaving(dish.id)
@@ -252,7 +272,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return
     setSavingCategory(true)
-
     const res = await fetch('/api/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -319,6 +338,24 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
             >
               Ver carta
             </button>
+
+            {/* Cerrar sesion — solo si NO es demo */}
+            {!isDemo && (
+              <button
+                onClick={handleLogout}
+                className="hidden md:flex text-sm text-gray-400 hover:text-gray-600 font-medium border border-gray-200 px-3 py-2 rounded-xl transition items-center gap-1.5"
+              >
+                Cerrar sesión
+              </button>
+            )}
+
+            {/* Badge demo */}
+            {isDemo && (
+              <span className="hidden md:flex items-center gap-1 text-xs bg-orange-100 text-orange-600 font-semibold px-3 py-1.5 rounded-full">
+                🎯 Demo
+              </span>
+            )}
+
             <button
               onClick={openCreate}
               className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-2 rounded-xl transition text-sm"
@@ -360,8 +397,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
         {/* ── TAB CATEGORÍAS ── */}
         {activeTab === 'categories' && (
           <div className="space-y-4">
-
-            {/* Añadir nueva categoría */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <h3 className="text-sm font-bold text-gray-900 mb-4">Nueva categoría</h3>
               <div className="flex gap-3">
@@ -386,7 +421,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
               </p>
             </div>
 
-            {/* Lista de categorías */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               {categories.length === 0 ? (
                 <div className="text-center py-10 text-gray-400 text-sm">
@@ -424,8 +458,6 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
             {/* FORMULARIO */}
             {showForm && (
               <div id="form-top" className="bg-white rounded-2xl shadow-sm p-5 mb-6 border border-orange-100">
-
-                {/* Header formulario */}
                 <div className="flex justify-between items-center mb-5">
                   <h3 className="text-base font-bold text-gray-900">
                     {editingDish ? '✏️ Editar plato' : '➕ Nuevo plato'}
@@ -539,13 +571,13 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {[
-                        { key: 'is_available',   label: '✅ Disponible',      desc: 'En carta hoy'         },
-                        { key: 'is_featured',    label: '⭐ Recomendado',     desc: 'Aparece destacado'    },
-                        { key: 'is_meat',        label: '🥩 Contiene carne',  desc: 'Excluido en vegano'   },
-                        { key: 'is_vegan',       label: '🌱 Vegano',          desc: 'Apto veganos'         },
-                        { key: 'is_vegetarian',  label: '🥦 Vegetariano',     desc: 'Sin carne ni pescado' },
-                        { key: 'is_gluten_free', label: '🌾 Sin gluten',      desc: 'Apto celiaquía'       },
-                        { key: 'is_pescatarian', label: '🐟 Pescado',         desc: 'Contiene pescado'     },
+                        { key: 'is_available',   label: '✅ Disponible',     desc: 'En carta hoy'         },
+                        { key: 'is_featured',    label: '⭐ Recomendado',    desc: 'Aparece destacado'    },
+                        { key: 'is_meat',        label: '🥩 Contiene carne', desc: 'Excluido en vegano'   },
+                        { key: 'is_vegan',       label: '🌱 Vegano',         desc: 'Apto veganos'         },
+                        { key: 'is_vegetarian',  label: '🥦 Vegetariano',    desc: 'Sin carne ni pescado' },
+                        { key: 'is_gluten_free', label: '🌾 Sin gluten',     desc: 'Apto celiaquía'       },
+                        { key: 'is_pescatarian', label: '🐟 Pescado',        desc: 'Contiene pescado'     },
                       ].map(opt => (
                         <label
                           key={opt.key}
@@ -625,7 +657,7 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
               </div>
             )}
 
-            {/* LISTA DE PLATOS — cards en móvil, tabla en desktop */}
+            {/* CARDS móvil */}
             <div className="space-y-3 md:hidden">
               {dishes.map(dish => (
                 <div key={dish.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -689,7 +721,7 @@ export default function AdminPage({ params }: { params: { slug: string } }) {
               ))}
             </div>
 
-            {/* TABLA — solo desktop */}
+            {/* TABLA desktop */}
             <div className="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
