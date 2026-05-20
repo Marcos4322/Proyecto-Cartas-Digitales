@@ -34,9 +34,9 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
 // Limpiar entradas antiguas cada 15 minutos para evitar memory leaks
 setInterval(() => {
   const now = Date.now()
-  for (const [ip, entry] of rateLimitMap.entries()) {
+  Array.from(rateLimitMap.entries()).forEach(([ip, entry]) => {
     if (now > entry.resetAt) rateLimitMap.delete(ip)
-  }
+  })
 }, 15 * 60 * 1000)
 
 // ── CACHÉ ──────────────────────────────────────────────────
