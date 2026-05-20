@@ -6,7 +6,7 @@ type Lang = 'es' | 'en' | 'de' | 'fr'
 
 type Message = {
   id: string
-  role: 'user' | 'bot'
+  role: 'user' | 'assistant'
   text: string
   time: string
 }
@@ -15,10 +15,20 @@ type Dish = {
   id: string
   name: string
   name_en: string
+  name_de: string
+  name_fr: string
+  description: string
+  description_en: string
+  description_de: string
+  description_fr: string
   price: number
   is_available: boolean
   is_vegan: boolean
+  is_vegetarian: boolean
   is_gluten_free: boolean
+  is_pescatarian: boolean
+  is_meat: boolean
+  dish_allergens: { allergens: { name: string; icon: string } }[]
 }
 
 type Props = {
@@ -28,15 +38,16 @@ type Props = {
 }
 
 const UI = {
-  title: { es: 'Asistente', en: 'Assistant', de: 'Assistent', fr: 'Assistant' },
-  subtitle: { es: 'Te ayudo con la carta y reservas', en: 'I help with the menu and reservations', de: 'Ich helfe mit der Karte', fr: 'Je vous aide avec la carte' },
+  title:    { es: 'Asistente IA',  en: 'AI Assistant',  de: 'KI-Assistent',  fr: 'Assistant IA'  },
+  subtitle: { es: 'Carta y reservas', en: 'Menu & reservations', de: 'Karte & Reservierung', fr: 'Carte & réservations' },
   placeholder: { es: 'Escribe tu pregunta...', en: 'Type your question...', de: 'Frage eingeben...', fr: 'Tapez votre question...' },
-  open: { es: '¿Tienes alguna pregunta?', en: 'Any questions?', de: 'Fragen?', fr: 'Des questions?' },
+  open:     { es: '¿Tienes alguna pregunta?', en: 'Any questions?', de: 'Fragen?', fr: 'Des questions?' },
+  error:    { es: 'Error al responder. Inténtalo de nuevo.', en: 'Error responding. Please try again.', de: 'Fehler. Bitte erneut versuchen.', fr: 'Erreur. Veuillez réessayer.' },
   suggestions: {
-    es: ['¿Tenéis opciones veganas?', '¿Qué platos no tienen gluten?', '¿Cómo puedo hacer una reserva?', '¿Cuál es el plato del día?'],
-    en: ['Do you have vegan options?', 'Which dishes are gluten-free?', 'How can I make a reservation?', 'What is the dish of the day?'],
-    de: ['Gibt es vegane Optionen?', 'Welche Gerichte sind glutenfrei?', 'Wie kann ich reservieren?', 'Was ist das Tagesgericht?'],
-    fr: ['Avez-vous des options veganes?', 'Quels plats sont sans gluten?', 'Comment faire une reservation?', 'Quel est le plat du jour?'],
+    es: ['¿Tenéis opciones veganas?', '¿Qué platos no tienen gluten?', 'Quiero hacer una reserva', '¿Cuál es el plato más popular?'],
+    en: ['Do you have vegan options?', 'Which dishes are gluten-free?', 'I want to make a reservation', 'What is the most popular dish?'],
+    de: ['Gibt es vegane Optionen?', 'Welche Gerichte sind glutenfrei?', 'Ich möchte reservieren', 'Was ist das beliebteste Gericht?'],
+    fr: ['Avez-vous des options veganes?', 'Quels plats sont sans gluten?', 'Je veux faire une réservation', 'Quel est le plat le plus populaire?'],
   }
 }
 
@@ -48,106 +59,27 @@ function t(key: keyof typeof UI, lang: Lang): string {
   return String(val)
 }
 
-function generateBotResponse(userText: string, lang: Lang, dishes: Dish[], restaurantName: string): string {
-  const text = userText.toLowerCase()
-
-  // Respuestas sobre vegano
-  if (text.includes('vegan') || text.includes('vegano') || text.includes('vegana')) {
-    const veganDishes = dishes.filter(d => d.is_vegan && d.is_available)
-    if (veganDishes.length === 0) {
-      return lang === 'es' ? 'Lo siento, en este momento no tenemos platos veganos disponibles.' :
-             lang === 'en' ? 'Sorry, we currently have no vegan dishes available.' :
-             lang === 'de' ? 'Es tut uns leid, wir haben aktuell keine veganen Gerichte.' :
-             'Desolé, nous n\'avons pas de plats vegans disponibles.'
-    }
-    const names = veganDishes.map(d => lang === 'es' ? d.name : d.name_en || d.name).join(', ')
-    return lang === 'es' ? `Tenemos estos platos veganos: ${names}. ¡Todos deliciosos! 🌱` :
-           lang === 'en' ? `We have these vegan dishes: ${names}. All delicious! 🌱` :
-           lang === 'de' ? `Wir haben diese veganen Gerichte: ${names}. Alle lecker! 🌱` :
-           `Nous avons ces plats vegans: ${names}. Tous delicieux! 🌱`
-  }
-
-  // Respuestas sobre sin gluten
-  if (text.includes('gluten') || text.includes('celiaco') || text.includes('celíaco')) {
-    const gfDishes = dishes.filter(d => d.is_gluten_free && d.is_available)
-    if (gfDishes.length === 0) {
-      return lang === 'es' ? 'En este momento no tenemos platos certificados sin gluten. Consulta con nuestro personal.' :
-             'We currently have no certified gluten-free dishes. Please ask our staff.'
-    }
-    const names = gfDishes.map(d => lang === 'es' ? d.name : d.name_en || d.name).join(', ')
-    return lang === 'es' ? `Nuestros platos sin gluten son: ${names}. 🌾` :
-           lang === 'en' ? `Our gluten-free dishes are: ${names}. 🌾` :
-           lang === 'de' ? `Unsere glutenfreien Gerichte: ${names}. 🌾` :
-           `Nos plats sans gluten: ${names}. 🌾`
-  }
-
-  // Respuestas sobre reserva
-  if (text.includes('reserva') || text.includes('reservation') || text.includes('reservar') || text.includes('book') || text.includes('tisch')) {
-    return lang === 'es' ? `Para hacer una reserva en ${restaurantName} puedes llamarnos o escribirnos directamente. ¡Estaremos encantados de atenderte! 📞` :
-           lang === 'en' ? `To make a reservation at ${restaurantName}, you can call us or write to us directly. We would be happy to help! 📞` :
-           lang === 'de' ? `Um bei ${restaurantName} zu reservieren, rufen Sie uns an oder schreiben Sie uns. Wir helfen gerne! 📞` :
-           `Pour reserver chez ${restaurantName}, appelez-nous ou ecrivez-nous. Nous serons ravis de vous aider! 📞`
-  }
-
-  // Respuestas sobre precio / carta
-  if (text.includes('precio') || text.includes('price') || text.includes('preis') || text.includes('combien') || text.includes('caro') || text.includes('barato')) {
-    const cheapest = dishes.filter(d => d.is_available).sort((a, b) => a.price - b.price)[0]
-    const mostExpensive = dishes.filter(d => d.is_available).sort((a, b) => b.price - a.price)[0]
-    if (!cheapest) return lang === 'es' ? 'Consulta nuestra carta completa para ver los precios.' : 'Check our full menu for prices.'
-    return lang === 'es' ? `Nuestros precios van desde ${cheapest.price}€ hasta ${mostExpensive.price}€. Tenemos opciones para todos los gustos. 😊` :
-           lang === 'en' ? `Our prices range from €${cheapest.price} to €${mostExpensive.price}. We have options for everyone. 😊` :
-           lang === 'de' ? `Unsere Preise reichen von ${cheapest.price}€ bis ${mostExpensive.price}€. 😊` :
-           `Nos prix vont de ${cheapest.price}€ a ${mostExpensive.price}€. 😊`
-  }
-
-  // Respuesta sobre plato del día
-  if (text.includes('plato del día') || text.includes('dish of the day') || text.includes('tagesgericht') || text.includes('plat du jour') || text.includes('especial')) {
-    const featured = dishes.filter(d => d.is_available)
-    if (featured.length > 0) {
-      const random = featured[Math.floor(Math.random() * featured.length)]
-      const name = lang === 'es' ? random.name : random.name_en || random.name
-      return lang === 'es' ? `Hoy te recomendamos especialmente: ${name} por ${random.price}€. ¡Está delicioso! ⭐` :
-             lang === 'en' ? `Today we especially recommend: ${name} for €${random.price}. It's delicious! ⭐` :
-             lang === 'de' ? `Heute empfehlen wir besonders: ${name} fur ${random.price}€. ⭐` :
-             `Aujourd'hui nous recommandons: ${name} pour ${random.price}€. ⭐`
-    }
-  }
-
-  // Respuesta sobre alérgenos
-  if (text.includes('alergen') || text.includes('allergen') || text.includes('alergia') || text.includes('allergy') || text.includes('intolerancia')) {
-    return lang === 'es' ? 'Todos nuestros platos tienen los alérgenos indicados con iconos en la carta. Si tienes alguna alergia grave, por favor consulta con nuestro personal antes de pedir. ⚠️' :
-           lang === 'en' ? 'All our dishes have allergens indicated with icons on the menu. If you have a severe allergy, please consult our staff before ordering. ⚠️' :
-           lang === 'de' ? 'Alle unsere Gerichte haben Allergene mit Symbolen in der Speisekarte. Bei schweren Allergien fragen Sie bitte unser Personal. ⚠️' :
-           'Tous nos plats ont les allergenes indiques avec des icones. En cas d\'allergie grave, consultez notre personnel. ⚠️'
-  }
-
-  // Respuesta por defecto
-  return lang === 'es' ? `Hola! Estoy aquí para ayudarte con cualquier pregunta sobre la carta de ${restaurantName}. Puedes preguntarme sobre platos veganos, alérgenos, precios o reservas. 😊` :
-         lang === 'en' ? `Hello! I'm here to help you with any questions about ${restaurantName}'s menu. You can ask me about vegan dishes, allergens, prices or reservations. 😊` :
-         lang === 'de' ? `Hallo! Ich bin hier, um Ihnen bei Fragen zur Speisekarte von ${restaurantName} zu helfen. Fragen Sie mich nach veganen Gerichten, Allergenen, Preisen oder Reservierungen. 😊` :
-         `Bonjour! Je suis ici pour vous aider avec toutes questions sur la carte de ${restaurantName}. Posez-moi des questions sur les plats vegans, les allergenes, les prix ou les reservations. 😊`
-}
-
 export default function Chatbot({ lang, restaurantName, dishes }: Props) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
+  const [isOpen, setIsOpen]           = useState(false)
+  const [messages, setMessages]       = useState<Message[]>([])
+  const [input, setInput]             = useState('')
+  const [isTyping, setIsTyping]       = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef       = useRef<HTMLInputElement>(null)
 
   const suggestions = UI.suggestions[lang] || UI.suggestions['es']
 
+  // Mensaje de bienvenida al abrir
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const welcome: Message = {
         id: '1',
-        role: 'bot',
-        text: lang === 'es' ? `Hola! Soy el asistente de ${restaurantName}. ¿En qué puedo ayudarte? 😊` :
-              lang === 'en' ? `Hello! I'm ${restaurantName}'s assistant. How can I help you? 😊` :
-              lang === 'de' ? `Hallo! Ich bin der Assistent von ${restaurantName}. Wie kann ich helfen? 😊` :
-              `Bonjour! Je suis l'assistant de ${restaurantName}. Comment puis-je vous aider? 😊`,
+        role: 'assistant',
+        text: lang === 'es' ? `¡Hola! Soy el asistente de ${restaurantName}. Puedo ayudarte con preguntas sobre la carta, alérgenos, precios o hacer una reserva. ¿En qué te ayudo? 😊` :
+              lang === 'en' ? `Hello! I'm ${restaurantName}'s assistant. I can help you with menu questions, allergens, prices or make a reservation. How can I help? 😊` :
+              lang === 'de' ? `Hallo! Ich bin der Assistent von ${restaurantName}. Ich helfe mit Fragen zur Speisekarte, Allergenen, Preisen oder Reservierungen. 😊` :
+              `Bonjour! Je suis l'assistant de ${restaurantName}. Je peux vous aider avec des questions sur la carte, les allergènes, les prix ou faire une réservation. 😊`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
       setMessages([welcome])
@@ -163,7 +95,7 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
   }, [isOpen])
 
   const sendMessage = async (text: string) => {
-    if (!text.trim()) return
+    if (!text.trim() || isTyping) return
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -172,24 +104,62 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
 
-    setMessages(prev => [...prev, userMsg])
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
     setInput('')
     setShowSuggestions(false)
     setIsTyping(true)
 
-    // Simular tiempo de respuesta
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 600))
+    try {
+      // Preparar historial para la API — solo los mensajes reales (sin bienvenida)
+      const apiMessages = updatedMessages.map(m => ({
+        role: m.role,
+        content: m.text,
+      }))
 
-    const botResponse = generateBotResponse(text, lang, dishes, restaurantName)
-    const botMsg: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'bot',
-      text: botResponse,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const res = await fetch('/api/chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          dishes,
+          lang,
+        }),
+      })
+
+      const data = await res.json()
+
+      const botText = res.ok
+        ? data.message
+        : res.status === 429
+          ? (lang === 'es' ? '⏳ Has enviado demasiados mensajes. Inténtalo en unos minutos.' :
+             lang === 'en' ? '⏳ Too many messages. Please try again in a few minutes.' :
+             lang === 'de' ? '⏳ Zu viele Nachrichten. Bitte warte einige Minuten.' :
+             '⏳ Trop de messages. Réessayez dans quelques minutes.')
+          : t('error', lang)
+
+      const botMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: botText,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+
+      setMessages(prev => [...prev, botMsg])
+
+    } catch {
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: t('error', lang),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+      setMessages(prev => [...prev, errorMsg])
+
+      
+    } finally {
+      setIsTyping(false)
     }
-
-    setIsTyping(false)
-    setMessages(prev => [...prev, botMsg])
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -201,7 +171,8 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
     <>
       {/* VENTANA DE CHAT */}
       {isOpen && (
-        <div className="fixed bottom-24 right-4 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 z-50 flex flex-col overflow-hidden"
+        <div
+          className="fixed bottom-24 right-4 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 z-50 flex flex-col overflow-hidden"
           style={{ height: '480px' }}
         >
           {/* Header */}
@@ -227,19 +198,24 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
           <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
             {messages.map(msg => (
               <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.role === 'bot' && (
+                {msg.role === 'assistant' && (
                   <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-xs mr-1.5 shrink-0 mt-1">
                     🤖
                   </div>
                 )}
                 <div className={`max-w-52 ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
-                  <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-orange-500 text-white rounded-tr-sm'
-                      : 'bg-white text-gray-800 shadow-sm rounded-tl-sm'
-                  }`}>
-                    {msg.text}
-                  </div>
+                  <div
+                    className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-orange-500 text-white rounded-tr-sm'
+                        : 'bg-white text-gray-800 shadow-sm rounded-tl-sm'
+                    }`}
+                    dangerouslySetInnerHTML={{
+                      __html: msg.text
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\n/g, '<br/>')
+                    }}
+                  />
                   <span className="text-xs text-gray-400 mt-0.5 px-1">{msg.time}</span>
                 </div>
               </div>
@@ -314,7 +290,7 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
           onClick={() => setIsOpen(!isOpen)}
           className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-2xl transition-all duration-300 ${
             isOpen
-              ? 'bg-gray-700 hover:bg-gray-800 rotate-0'
+              ? 'bg-gray-700 hover:bg-gray-800'
               : 'bg-orange-500 hover:bg-orange-600 hover:scale-110'
           }`}
         >
