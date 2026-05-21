@@ -35,19 +35,20 @@ type Props = {
   lang: Lang
   restaurantName: string
   dishes: Dish[]
+  restaurantId: string
 }
 
 const UI = {
-  title:    { es: 'Asistente IA',  en: 'AI Assistant',  de: 'KI-Assistent',  fr: 'Assistant IA'  },
-  subtitle: { es: 'Carta y reservas', en: 'Menu & reservations', de: 'Karte & Reservierung', fr: 'Carte & réservations' },
+  title:       { es: 'Asistente IA',        en: 'AI Assistant',        de: 'KI-Assistent',        fr: 'Assistant IA'         },
+  subtitle:    { es: 'Carta y reservas',     en: 'Menu & reservations', de: 'Karte & Reservierung', fr: 'Carte & réservations' },
   placeholder: { es: 'Escribe tu pregunta...', en: 'Type your question...', de: 'Frage eingeben...', fr: 'Tapez votre question...' },
-  open:     { es: '¿Tienes alguna pregunta?', en: 'Any questions?', de: 'Fragen?', fr: 'Des questions?' },
-  error:    { es: 'Error al responder. Inténtalo de nuevo.', en: 'Error responding. Please try again.', de: 'Fehler. Bitte erneut versuchen.', fr: 'Erreur. Veuillez réessayer.' },
+  open:        { es: '¿Tienes alguna pregunta?', en: 'Any questions?', de: 'Fragen?', fr: 'Des questions?' },
+  error:       { es: 'Error al responder. Inténtalo de nuevo.', en: 'Error responding. Please try again.', de: 'Fehler. Bitte erneut versuchen.', fr: 'Erreur. Veuillez réessayer.' },
   suggestions: {
-    es: ['¿Tenéis opciones veganas?', '¿Qué platos no tienen gluten?', 'Quiero hacer una reserva', '¿Cuál es el plato más popular?'],
-    en: ['Do you have vegan options?', 'Which dishes are gluten-free?', 'I want to make a reservation', 'What is the most popular dish?'],
-    de: ['Gibt es vegane Optionen?', 'Welche Gerichte sind glutenfrei?', 'Ich möchte reservieren', 'Was ist das beliebteste Gericht?'],
-    fr: ['Avez-vous des options veganes?', 'Quels plats sont sans gluten?', 'Je veux faire une réservation', 'Quel est le plat le plus populaire?'],
+    es: ['¿Tenéis opciones veganas?', '¿Qué platos no tienen gluten?', 'Quiero hacer una reserva', '¿Cuál es el plato del día?'],
+    en: ['Do you have vegan options?', 'Which dishes are gluten-free?', 'I want to make a reservation', "What's today's special?"],
+    de: ['Gibt es vegane Optionen?', 'Welche Gerichte sind glutenfrei?', 'Ich möchte reservieren', 'Was ist das Tagesgericht?'],
+    fr: ['Avez-vous des options veganes?', 'Quels plats sont sans gluten?', 'Je veux faire une réservation', "Quel est le plat du jour?"],
   }
 }
 
@@ -59,27 +60,35 @@ function t(key: keyof typeof UI, lang: Lang): string {
   return String(val)
 }
 
-export default function Chatbot({ lang, restaurantName, dishes }: Props) {
-  const [isOpen, setIsOpen]           = useState(false)
-  const [messages, setMessages]       = useState<Message[]>([])
-  const [input, setInput]             = useState('')
-  const [isTyping, setIsTyping]       = useState(false)
+function formatMessage(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br/>')
+}
+
+export default function Chatbot({ lang, restaurantName, dishes, restaurantId }: Props) {
+  const [isOpen, setIsOpen]                   = useState(false)
+  const [messages, setMessages]               = useState<Message[]>([])
+  const [input, setInput]                     = useState('')
+  const [isTyping, setIsTyping]               = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef       = useRef<HTMLInputElement>(null)
 
   const suggestions = UI.suggestions[lang] || UI.suggestions['es']
 
-  // Mensaje de bienvenida al abrir
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const welcome: Message = {
-        id: '1',
+        id: 'welcome',
         role: 'assistant',
-        text: lang === 'es' ? `¡Hola! Soy el asistente de ${restaurantName}. Puedo ayudarte con preguntas sobre la carta, alérgenos, precios o hacer una reserva. ¿En qué te ayudo? 😊` :
-              lang === 'en' ? `Hello! I'm ${restaurantName}'s assistant. I can help you with menu questions, allergens, prices or make a reservation. How can I help? 😊` :
-              lang === 'de' ? `Hallo! Ich bin der Assistent von ${restaurantName}. Ich helfe mit Fragen zur Speisekarte, Allergenen, Preisen oder Reservierungen. 😊` :
-              `Bonjour! Je suis l'assistant de ${restaurantName}. Je peux vous aider avec des questions sur la carte, les allergènes, les prix ou faire une réservation. 😊`,
+        text: lang === 'es'
+          ? `¡Hola! Soy el asistente de **${restaurantName}**. Puedo ayudarte con preguntas sobre la carta, alérgenos, precios o hacer una reserva. ¿En qué te ayudo? 😊`
+          : lang === 'en'
+          ? `Hello! I'm **${restaurantName}**'s assistant. I can help with menu questions, allergens, prices or reservations. How can I help? 😊`
+          : lang === 'de'
+          ? `Hallo! Ich bin der Assistent von **${restaurantName}**. Ich helfe mit Fragen zur Speisekarte, Allergenen, Preisen oder Reservierungen. 😊`
+          : `Bonjour! Je suis l'assistant de **${restaurantName}**. Je peux vous aider avec la carte, les allergènes, les prix ou les réservations. 😊`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
       setMessages([welcome])
@@ -111,52 +120,69 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
     setIsTyping(true)
 
     try {
-      // Preparar historial para la API — solo los mensajes reales (sin bienvenida)
-      const apiMessages = updatedMessages.map(m => ({
-        role: m.role,
-        content: m.text,
-      }))
+      // Filtrar mensaje de bienvenida — solo enviar mensajes reales
+      const apiMessages = updatedMessages
+        .filter(m => m.id !== 'welcome')
+        .map(m => ({ role: m.role, content: m.text }))
+
+      // Garantizar que empieza por 'user'
+      const firstUserIndex = apiMessages.findIndex(m => m.role === 'user')
+      const filteredMessages = firstUserIndex >= 0
+        ? apiMessages.slice(firstUserIndex)
+        : apiMessages
+
+      // Log para debug
+      console.log('Enviando al chatbot:', {
+        restaurantId,
+        messagesCount: filteredMessages.length,
+        firstMessage: filteredMessages[0],
+      })
 
       const res = await fetch('/api/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: apiMessages,
+          messages: filteredMessages,
           dishes,
           lang,
+          restaurantId,
         }),
       })
 
       const data = await res.json()
 
+      // Log respuesta
+      console.log('Respuesta chatbot:', {
+        ok: res.ok,
+        status: res.status,
+        reservationCreated: data.reservationCreated,
+        debug: data.debug,
+      })
+
       const botText = res.ok
         ? data.message
         : res.status === 429
-          ? (lang === 'es' ? '⏳ Has enviado demasiados mensajes. Inténtalo en unos minutos.' :
-             lang === 'en' ? '⏳ Too many messages. Please try again in a few minutes.' :
-             lang === 'de' ? '⏳ Zu viele Nachrichten. Bitte warte einige Minuten.' :
-             '⏳ Trop de messages. Réessayez dans quelques minutes.')
+          ? (lang === 'es' ? '⏳ Has enviado demasiados mensajes. Inténtalo en unos minutos.'
+           : lang === 'en' ? '⏳ Too many messages. Please try again in a few minutes.'
+           : lang === 'de' ? '⏳ Zu viele Nachrichten. Bitte warte einige Minuten.'
+           : '⏳ Trop de messages. Réessayez dans quelques minutes.')
           : t('error', lang)
 
-      const botMsg: Message = {
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         text: botText,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
+      }])
 
-      setMessages(prev => [...prev, botMsg])
-
-    } catch {
-      const errorMsg: Message = {
+    } catch (err) {
+      console.error('Error en chatbot:', err)
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         text: t('error', lang),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-      setMessages(prev => [...prev, errorMsg])
-
-      
+      }])
     } finally {
       setIsTyping(false)
     }
@@ -169,32 +195,32 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
 
   return (
     <>
-      {/* VENTANA DE CHAT */}
       {isOpen && (
         <div
           className="fixed bottom-24 right-4 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 z-50 flex flex-col overflow-hidden"
-          style={{ height: '480px' }}
+          style={{ height: '500px' }}
         >
-          {/* Header */}
-          <div className="bg-orange-500 px-4 py-3 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-lg">
+          <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-4 py-3 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-xl">
                 🤖
               </div>
               <div>
                 <p className="text-white font-bold text-sm">{t('title', lang)}</p>
-                <p className="text-orange-100 text-xs">{t('subtitle', lang)}</p>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse" />
+                  <p className="text-orange-100 text-xs">{t('subtitle', lang)}</p>
+                </div>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-white hover:text-orange-200 transition text-lg font-bold w-7 h-7 flex items-center justify-center"
+              className="text-white hover:text-orange-200 transition w-7 h-7 flex items-center justify-center rounded-full hover:bg-white hover:bg-opacity-10"
             >
               ✕
             </button>
           </div>
 
-          {/* Mensajes */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
             {messages.map(msg => (
               <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -203,25 +229,20 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
                     🤖
                   </div>
                 )}
-                <div className={`max-w-52 ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
+                <div className={`max-w-56 flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
                     className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-orange-500 text-white rounded-tr-sm'
                         : 'bg-white text-gray-800 shadow-sm rounded-tl-sm'
                     }`}
-                    dangerouslySetInnerHTML={{
-                      __html: msg.text
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/\n/g, '<br/>')
-                    }}
+                    dangerouslySetInnerHTML={{ __html: formatMessage(msg.text) }}
                   />
                   <span className="text-xs text-gray-400 mt-0.5 px-1">{msg.time}</span>
                 </div>
               </div>
             ))}
 
-            {/* Typing indicator */}
             {isTyping && (
               <div className="flex justify-start items-center gap-1.5">
                 <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-xs shrink-0">
@@ -237,14 +258,13 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
               </div>
             )}
 
-            {/* Sugerencias */}
             {showSuggestions && messages.length <= 1 && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 mt-1">
                 {suggestions.map((s, i) => (
                   <button
                     key={i}
                     onClick={() => sendMessage(s)}
-                    className="w-full text-left text-xs bg-white hover:bg-orange-50 border border-gray-200 hover:border-orange-300 text-gray-700 px-3 py-2 rounded-xl transition"
+                    className="w-full text-left text-xs bg-white hover:bg-orange-50 border border-gray-200 hover:border-orange-300 text-gray-600 px-3 py-2 rounded-xl transition"
                   >
                     {s}
                   </button>
@@ -255,7 +275,6 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
           <form onSubmit={handleSubmit} className="p-3 bg-white border-t border-gray-100 flex gap-2 shrink-0">
             <input
               ref={inputRef}
@@ -279,7 +298,6 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
         </div>
       )}
 
-      {/* BOTÓN FLOTANTE */}
       <div className="fixed bottom-6 right-4 z-50 flex flex-col items-end gap-2">
         {!isOpen && (
           <div className="bg-white text-gray-700 text-xs font-medium px-3 py-1.5 rounded-full shadow-md border border-gray-100 animate-bounce">
@@ -289,9 +307,7 @@ export default function Chatbot({ lang, restaurantName, dishes }: Props) {
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-2xl transition-all duration-300 ${
-            isOpen
-              ? 'bg-gray-700 hover:bg-gray-800'
-              : 'bg-orange-500 hover:bg-orange-600 hover:scale-110'
+            isOpen ? 'bg-gray-700 hover:bg-gray-800' : 'bg-orange-500 hover:bg-orange-600 hover:scale-110'
           }`}
         >
           {isOpen ? '✕' : '💬'}
